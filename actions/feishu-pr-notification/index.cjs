@@ -77,6 +77,19 @@ function isSuccessfulResponse(payload) {
   );
 }
 
+function resolveNotificationConfiguration(webhook, secret) {
+  const hasWebhook = typeof webhook === "string" && webhook.length > 0;
+  const hasSecret = typeof secret === "string" && secret.length > 0;
+
+  if (!hasWebhook && !hasSecret) return { enabled: false };
+  if (!hasWebhook || !hasSecret) {
+    throw new Error(
+      "Both FEISHU_PR_BOT_WEBHOOK and FEISHU_PR_BOT_SECRET must be configured.",
+    );
+  }
+  return { enabled: true, webhook, secret };
+}
+
 async function sendNotification({
   event,
   repository,
@@ -119,12 +132,21 @@ async function sendNotification({
 }
 
 async function main() {
+  const configuration = resolveNotificationConfiguration(
+    process.env.FEISHU_PR_BOT_WEBHOOK,
+    process.env.FEISHU_PR_BOT_SECRET,
+  );
+  if (!configuration.enabled) {
+    console.log("Feishu bot secrets are not configured; skipping notification.");
+    return;
+  }
+
   const event = JSON.parse(fs.readFileSync(process.env.EVENT_PATH, "utf8"));
   await sendNotification({
     event,
     repository: process.env.REPOSITORY,
-    webhook: process.env.FEISHU_PR_BOT_WEBHOOK,
-    secret: process.env.FEISHU_PR_BOT_SECRET,
+    webhook: configuration.webhook,
+    secret: configuration.secret,
   });
   console.log("Feishu PR notification sent.");
 }
@@ -139,6 +161,7 @@ if (require.main === module) {
 module.exports = {
   formatNotificationText,
   isSuccessfulResponse,
+  resolveNotificationConfiguration,
   sanitizeFeishuField,
   sendNotification,
 };
