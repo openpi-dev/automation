@@ -163,6 +163,13 @@ function resolveNotificationConfiguration(webhook, secret) {
   return { enabled: true, webhook, secret };
 }
 
+function readPullRequestEvent(eventPath) {
+  if (typeof eventPath !== "string" || eventPath.trim().length === 0) {
+    throw new Error("GITHUB_EVENT_PATH is required.");
+  }
+  return JSON.parse(fs.readFileSync(eventPath, "utf8"));
+}
+
 async function sendNotification({
   event,
   repository,
@@ -214,7 +221,7 @@ async function main() {
     return;
   }
 
-  const event = JSON.parse(fs.readFileSync(process.env.EVENT_PATH, "utf8"));
+  const event = readPullRequestEvent(process.env.GITHUB_EVENT_PATH);
   await sendNotification({
     event,
     repository: process.env.REPOSITORY,
@@ -234,6 +241,7 @@ if (require.main === module) {
 module.exports = {
   formatNotificationCard,
   isSuccessfulResponse,
+  readPullRequestEvent,
   resolveNotificationConfiguration,
   sanitizeFeishuField,
   sendNotification,

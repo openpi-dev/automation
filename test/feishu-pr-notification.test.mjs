@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 const require = createRequire(import.meta.url);
@@ -194,6 +197,21 @@ test("the card button accepts only the exact GitHub pull request URL", () => {
       ),
     /Invalid pull request number/u,
   );
+});
+
+test("the action reads the pull request from GitHub's standard event path", () => {
+  const directory = mkdtempSync(join(tmpdir(), "openpi-event-"));
+  const eventPath = join(directory, "event.json");
+  try {
+    writeFileSync(eventPath, JSON.stringify(event()));
+    assert.deepEqual(notification.readPullRequestEvent(eventPath), event());
+    assert.throws(
+      () => notification.readPullRequestEvent(""),
+      /GITHUB_EVENT_PATH is required/u,
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("the two Feishu secrets are optional only as a pair", () => {
