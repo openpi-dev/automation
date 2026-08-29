@@ -19,7 +19,7 @@ jobs:
     steps:
       - name: Resolve release source
         id: source
-        uses: openpi-dev/automation/actions/openpi-release-validation@c631a31ed6f1851aebe0c0c20cf898f8013a5fbb
+        uses: openpi-dev/automation/actions/openpi-release-validation@df7b1ee59baae8a48b6930bbb0cc21f9571a8280
         with:
           mode: resolve
           release_tag: ${{ inputs.tag }}
@@ -42,7 +42,7 @@ jobs:
       - run: bun run check
       - run: bun run test
       - name: Verify package version
-        uses: openpi-dev/automation/actions/openpi-release-validation@c631a31ed6f1851aebe0c0c20cf898f8013a5fbb
+        uses: openpi-dev/automation/actions/openpi-release-validation@df7b1ee59baae8a48b6930bbb0cc21f9571a8280
         with:
           mode: verify-package
           release_tag: ${{ steps.source.outputs.tag }}

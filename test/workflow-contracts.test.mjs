@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const ACTION_SHA = "c631a31ed6f1851aebe0c0c20cf898f8013a5fbb";
+const ACTION_SHA = "df7b1ee59baae8a48b6930bbb0cc21f9571a8280";
 
 function workflow(name) {
   return readFileSync(`.github/workflows/${name}.yml`, "utf8");
