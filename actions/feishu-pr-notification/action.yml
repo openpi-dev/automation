@@ -1,5 +1,5 @@
 name: Feishu PR notification
-description: Send a sanitized OpenPI pull-request notification to Feishu
+description: Send a sanitized OpenPI pull-request card to Feishu
 runs:
   using: node24
   main: index.cjs

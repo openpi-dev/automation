@@ -45,18 +45,48 @@ async function withServer(response, run) {
   }
 }
 
-test("benign pull request metadata keeps the existing notification", () => {
-  assert.equal(
-    notification.formatNotificationText(event(), "openpi-dev/openpi"),
-    [
-      "openpi-dev/openpi 有新的 PR",
-      "#270 feat(ci): notify Feishu for new pull requests",
-      "作者：contributor",
-      "审阅人：reviewer, team/release-managers",
-      "分支：contributor:feature -> main",
-      "PR 链接：https://github.com/openpi-dev/openpi/pull/270",
-    ].join("\n"),
+function textContents(value) {
+  if (Array.isArray(value)) return value.flatMap(textContents);
+  if (value === null || typeof value !== "object") return [];
+  const content =
+    value.tag === "plain_text" && typeof value.content === "string"
+      ? [value.content]
+      : [];
+  return [
+    ...content,
+    ...Object.values(value).flatMap((child) => textContents(child)),
+  ];
+}
+
+test("benign pull request metadata produces the intended interactive card", () => {
+  const card = notification.formatNotificationCard(
+    event(),
+    "openpi-dev/openpi",
   );
+
+  assert.deepEqual(card.header, {
+    template: "blue",
+    title: { tag: "plain_text", content: "New pull request" },
+  });
+  assert.deepEqual(textContents(card), [
+    "New pull request",
+    "openpi-dev/openpi · PR #270\n🟢 Open\nfeat(ci): notify Feishu for new pull requests",
+    "Author\ncontributor",
+    "Reviewers\nreviewer, team/release-managers",
+    "Branches\ncontributor:feature → main",
+    "View pull request",
+  ]);
+  assert.deepEqual(card.elements.at(-1), {
+    tag: "action",
+    actions: [
+      {
+        tag: "button",
+        text: { tag: "plain_text", content: "View pull request" },
+        type: "primary",
+        url: "https://github.com/openpi-dev/openpi/pull/270",
+      },
+    ],
+  });
   assert.equal(
     notification.sanitizeFeishuField(
       "fix A & B, AT&T · 支持①号 ﬃ ligature &#600; &#620; &#x3ca; &#x3e0;",
@@ -66,7 +96,7 @@ test("benign pull request metadata keeps the existing notification", () => {
 });
 
 test("untrusted metadata cannot inject Feishu tags or message fields", () => {
-  const text = notification.formatNotificationText(
+  const card = notification.formatNotificationCard(
     event({
       title:
         '<at user_id="all">所有人</at> &lt;at&gt; &ltat&gt; &LT/at&gt; &#60;at&gt; &#60/at&gt; &#x3c;at&gt; ＆ｌｔ；at\r\n作者：伪造\u202e\u2066',
@@ -76,43 +106,94 @@ test("untrusted metadata cannot inject Feishu tags or message fields", () => {
     }),
     "openpi-dev/openpi",
   );
-  const lines = text.split("\n");
+  const contents = textContents(card);
+  const serialized = JSON.stringify(card);
 
-  assert.equal(lines.length, 6);
-  assert.equal(lines.filter((line) => line.startsWith("作者：")).length, 1);
   assert.doesNotMatch(
-    text,
+    serialized,
     /<|&|[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u,
   );
-  assert.match(lines[1], /‹at user_id="all"›所有人‹\/at›/u);
-  assert.doesNotMatch(text.normalize("NFKC"), /<at/u);
+  assert.match(contents[1], /‹at user_id="all"›所有人‹\/at›/u);
+  assert.doesNotMatch(serialized.normalize("NFKC"), /<at/u);
+  assert.equal(
+    card.elements.filter((element) => element.tag === "action").length,
+    1,
+  );
+  assert.equal(card.elements.at(-1).actions.length, 1);
 });
 
 test("field and reviewer bounds count code points without splitting Unicode", () => {
   assert.equal(notification.sanitizeFeishuField("🙂".repeat(10), 4), "🙂🙂🙂…");
 
-  const reviewers = notification
-    .formatNotificationText(
-      event({
-        requested_reviewers: Array.from({ length: 100 }, (_, index) => ({
-          login: `reviewer-${index}-${"🙂".repeat(20)}`,
-        })),
-        requested_teams: [],
-      }),
-      "openpi-dev/openpi",
-    )
-    .split("\n")[3];
-  assert.ok(Array.from(reviewers.slice("审阅人：".length)).length <= 512);
+  const card = notification.formatNotificationCard(
+    event({
+      requested_reviewers: Array.from({ length: 100 }, (_, index) => ({
+        login: `reviewer-${index}-${"🙂".repeat(20)}`,
+      })),
+      requested_teams: [],
+    }),
+    "openpi-dev/openpi",
+  );
+  const reviewers = card.elements[2].fields[1].text.content.slice(
+    "Reviewers\n".length,
+  );
+  assert.ok(Array.from(reviewers).length <= 512);
   assert.ok(reviewers.endsWith("…"));
 });
 
 test("missing PR metadata keeps bounded fallback fields", () => {
-  const text = notification.formatNotificationText(
+  const card = notification.formatNotificationCard(
     event({ user: undefined, requested_reviewers: [], requested_teams: [] }),
     "openpi-dev/openpi",
   );
-  assert.match(text, /^作者：unknown$/mu);
-  assert.match(text, /^审阅人：未指定$/mu);
+  assert.equal(card.elements[2].fields[0].text.content, "Author\nunknown");
+  assert.equal(card.elements[2].fields[1].text.content, "Reviewers\n未指定");
+});
+
+test("the card button accepts only the exact GitHub pull request URL", () => {
+  assert.equal(
+    notification.validatePullRequestUrl(
+      "https://github.com/openpi-dev/openpi/pull/270",
+      "openpi-dev/openpi",
+      270,
+    ),
+    "https://github.com/openpi-dev/openpi/pull/270",
+  );
+  for (const url of [
+    "http://github.com/openpi-dev/openpi/pull/270",
+    "https://evil.example/openpi-dev/openpi/pull/270",
+    "https://github.com/openpi-dev/openpi/pull/271",
+    "https://github.com/openpi-dev/openpi/pull/270?diff=split",
+    "not-a-url",
+  ]) {
+    assert.throws(
+      () =>
+        notification.validatePullRequestUrl(
+          url,
+          "openpi-dev/openpi",
+          270,
+        ),
+      /Pull request URL/u,
+    );
+  }
+  assert.throws(
+    () =>
+      notification.validatePullRequestUrl(
+        "https://github.com/openpi-dev/openpi/pull/270",
+        "openpi-dev/openpi/extra",
+        270,
+      ),
+    /Invalid GitHub repository/u,
+  );
+  assert.throws(
+    () =>
+      notification.validatePullRequestUrl(
+        "https://github.com/openpi-dev/openpi/pull/270",
+        "openpi-dev/openpi",
+        -1,
+      ),
+    /Invalid pull request number/u,
+  );
 });
 
 test("the two Feishu secrets are optional only as a pair", () => {
@@ -140,7 +221,7 @@ test("current and legacy Feishu success responses remain accepted", () => {
   assert.equal(notification.isSuccessfulResponse(null), false);
 });
 
-test("the HTTP payload uses sanitized text and the expected signature", async () => {
+test("the HTTP payload uses a sanitized card and the expected signature", async () => {
   await withServer({ status: 200, body: '{"code":0}' }, async (webhook, body) => {
     const now = 1_700_000_000_000;
     const secret = "test-secret";
@@ -160,9 +241,14 @@ test("the HTTP payload uses sanitized text and the expected signature", async ()
 
     assert.equal(payload.timestamp, timestamp);
     assert.equal(payload.sign, expectedSign);
-    assert.equal(payload.msg_type, "text");
-    assert.doesNotMatch(payload.content.text.normalize("NFKC"), /<at/u);
-    assert.equal(payload.content.text.split("\n").length, 6);
+    assert.equal(payload.msg_type, "interactive");
+    assert.doesNotMatch(JSON.stringify(payload.card).normalize("NFKC"), /<at/u);
+    assert.equal(payload.card.header.template, "blue");
+    assert.equal(payload.card.elements.at(-1).actions[0].type, "primary");
+    assert.equal(
+      payload.card.elements.at(-1).actions[0].url,
+      "https://github.com/openpi-dev/openpi/pull/270",
+    );
   });
 });
 

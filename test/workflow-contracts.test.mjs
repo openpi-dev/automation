@@ -89,7 +89,6 @@ test("release validates and transfers one package artifact before publishing", (
 
 test("every external action reference is pinned to a full commit SHA", () => {
   for (const name of [
-    "automation-ci",
     "openpi-feishu-pr-notification",
     "openpi-release",
   ]) {

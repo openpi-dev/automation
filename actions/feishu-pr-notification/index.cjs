@@ -4,9 +4,9 @@ const fs = require("node:fs");
 const FIELD_LIMIT = 256;
 const REVIEWER_LIMIT = 128;
 const REVIEWERS_LIMIT = 512;
-const URL_LIMIT = 512;
 const CONTROL_OR_LINE_SEPARATOR = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u;
 const BIDI_CONTROL = /[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u;
+const GITHUB_REPOSITORY = /^[a-z0-9_.-]+\/[a-z0-9_.-]+$/iu;
 
 function truncateCodePoints(value, maxCodePoints) {
   const points = Array.from(value);
@@ -43,8 +43,46 @@ function sanitizeFeishuField(value, maxCodePoints = FIELD_LIMIT) {
   );
 }
 
-function formatNotificationText(event, repository) {
+function validatePullRequestUrl(value, repository, number) {
+  if (!GITHUB_REPOSITORY.test(repository)) {
+    throw new Error(`Invalid GitHub repository: ${repository}`);
+  }
+  if (!Number.isSafeInteger(number) || number <= 0) {
+    throw new Error(`Invalid pull request number: ${number}`);
+  }
+
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error("Pull request URL must be a valid URL.");
+  }
+
+  const expectedPath = `/${repository}/pull/${number}`;
+  if (
+    url.protocol !== "https:" ||
+    url.hostname !== "github.com" ||
+    url.port !== "" ||
+    url.username !== "" ||
+    url.password !== "" ||
+    url.pathname !== expectedPath ||
+    url.search !== "" ||
+    url.hash !== ""
+  ) {
+    throw new Error(
+      `Pull request URL must be https://github.com${expectedPath}.`,
+    );
+  }
+  return url.href;
+}
+
+function plainText(content) {
+  return { tag: "plain_text", content };
+}
+
+function formatNotificationCard(event, repository) {
   const pr = event.pull_request;
+  const url = validatePullRequestUrl(pr.html_url, repository, pr.number);
   const author = sanitizeFeishuField(pr.user?.login ?? "unknown");
   const reviewers = [
     ...(pr.requested_reviewers ?? []).map((reviewer) =>
@@ -58,15 +96,50 @@ function formatNotificationText(event, repository) {
     reviewers.length > 0
       ? sanitizeFeishuField(reviewers.join(", "), REVIEWERS_LIMIT)
       : "未指定";
-  const lines = [
-    `${sanitizeFeishuField(repository)} 有新的 PR`,
-    `#${pr.number} ${sanitizeFeishuField(pr.title)}`,
-    `作者：${author}`,
-    `审阅人：${reviewerText}`,
-    `分支：${sanitizeFeishuField(pr.head.label)} -> ${sanitizeFeishuField(pr.base.ref)}`,
-    `PR 链接：${sanitizeFeishuField(pr.html_url, URL_LIMIT)}`,
-  ];
-  return lines.join("\n");
+
+  return {
+    config: { wide_screen_mode: true },
+    header: {
+      template: "blue",
+      title: plainText("New pull request"),
+    },
+    elements: [
+      {
+        tag: "div",
+        text: plainText(
+          `${sanitizeFeishuField(repository)} · PR #${pr.number}\n🟢 Open\n${sanitizeFeishuField(pr.title)}`,
+        ),
+      },
+      { tag: "hr" },
+      {
+        tag: "div",
+        fields: [
+          { is_short: true, text: plainText(`Author\n${author}`) },
+          {
+            is_short: true,
+            text: plainText(`Reviewers\n${reviewerText}`),
+          },
+          {
+            is_short: false,
+            text: plainText(
+              `Branches\n${sanitizeFeishuField(pr.head.label)} → ${sanitizeFeishuField(pr.base.ref)}`,
+            ),
+          },
+        ],
+      },
+      {
+        tag: "action",
+        actions: [
+          {
+            tag: "button",
+            text: plainText("View pull request"),
+            type: "primary",
+            url,
+          },
+        ],
+      },
+    ],
+  };
 }
 
 function isSuccessfulResponse(payload) {
@@ -109,8 +182,8 @@ async function sendNotification({
     body: JSON.stringify({
       timestamp,
       sign,
-      msg_type: "text",
-      content: { text: formatNotificationText(event, repository) },
+      msg_type: "interactive",
+      card: formatNotificationCard(event, repository),
     }),
   });
   const text = await response.text();
@@ -159,9 +232,10 @@ if (require.main === module) {
 }
 
 module.exports = {
-  formatNotificationText,
+  formatNotificationCard,
   isSuccessfulResponse,
   resolveNotificationConfiguration,
   sanitizeFeishuField,
   sendNotification,
+  validatePullRequestUrl,
 };
