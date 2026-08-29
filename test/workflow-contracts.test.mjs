@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const ACTION_SHA = "df7b1ee59baae8a48b6930bbb0cc21f9571a8280";
+const FEISHU_ACTION_SHA = "a5aacc1548cd48b7939f1a391926344237f501d3";
+const RELEASE_ACTION_SHA = "df7b1ee59baae8a48b6930bbb0cc21f9571a8280";
 
 function workflow(name) {
   return readFileSync(`.github/workflows/${name}.yml`, "utf8");
@@ -20,7 +21,7 @@ test("Feishu suppresses drafts and passes only the optional secret pair", () => 
   assert.match(
     source,
     new RegExp(
-      `uses: openpi-dev/automation/actions/feishu-pr-notification@${ACTION_SHA}`,
+      `uses: openpi-dev/automation/actions/feishu-pr-notification@${FEISHU_ACTION_SHA}`,
     ),
   );
   assert.match(
@@ -33,7 +34,7 @@ test("Feishu suppresses drafts and passes only the optional secret pair", () => 
   );
   assert.doesNotMatch(
     source,
-    /actions\/checkout|pull_request\.head|github\.head_ref/u,
+    /actions\/checkout|pull_request\.head|github\.head_ref|EVENT_PATH|github\.event_path/u,
   );
 });
 
@@ -45,7 +46,7 @@ test("release resolves and verifies the exact tag through tested actions", () =>
 
   assert.equal(validationCalls?.length, 2);
   for (const call of validationCalls ?? []) {
-    assert.match(call, new RegExp(ACTION_SHA));
+    assert.match(call, new RegExp(RELEASE_ACTION_SHA));
   }
   assert.match(source, /mode: resolve/u);
   assert.match(source, /release_tag: \$\{\{ inputs\.tag \}\}/u);
