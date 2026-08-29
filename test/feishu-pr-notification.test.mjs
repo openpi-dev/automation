@@ -69,14 +69,18 @@ test("benign pull request metadata produces the intended interactive card", () =
 
   assert.deepEqual(card.header, {
     template: "blue",
-    title: { tag: "plain_text", content: "New pull request" },
+    title: {
+      tag: "plain_text",
+      content: "PR #270 · feat(ci): notify Feishu for new pull requests",
+    },
   });
+  assert.deepEqual(card.config, { wide_screen_mode: false });
   assert.deepEqual(textContents(card), [
-    "New pull request",
-    "openpi-dev/openpi · PR #270\n🟢 Open\nfeat(ci): notify Feishu for new pull requests",
+    "PR #270 · feat(ci): notify Feishu for new pull requests",
+    "openpi-dev/openpi · 🟢 Open",
     "Author\ncontributor",
     "Reviewers\nreviewer, team/release-managers",
-    "Branches\ncontributor:feature → main",
+    "Source → target\ncontributor:feature → main",
     "View pull request",
   ]);
   assert.deepEqual(card.elements.at(-1), {
@@ -116,7 +120,7 @@ test("untrusted metadata cannot inject Feishu tags or message fields", () => {
     serialized,
     /<|&|[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u,
   );
-  assert.match(contents[1], /‹at user_id="all"›所有人‹\/at›/u);
+  assert.match(contents[0], /‹at user_id="all"›所有人‹\/at›/u);
   assert.doesNotMatch(serialized.normalize("NFKC"), /<at/u);
   assert.equal(
     card.elements.filter((element) => element.tag === "action").length,
@@ -137,7 +141,7 @@ test("field and reviewer bounds count code points without splitting Unicode", ()
     }),
     "openpi-dev/openpi",
   );
-  const reviewers = card.elements[2].fields[1].text.content.slice(
+  const reviewers = card.elements[1].fields[1].text.content.slice(
     "Reviewers\n".length,
   );
   assert.ok(Array.from(reviewers).length <= 512);
@@ -149,8 +153,8 @@ test("missing PR metadata keeps bounded fallback fields", () => {
     event({ user: undefined, requested_reviewers: [], requested_teams: [] }),
     "openpi-dev/openpi",
   );
-  assert.equal(card.elements[2].fields[0].text.content, "Author\nunknown");
-  assert.equal(card.elements[2].fields[1].text.content, "Reviewers\n未指定");
+  assert.equal(card.elements[1].fields[0].text.content, "Author\nunknown");
+  assert.equal(card.elements[1].fields[1].text.content, "Reviewers\n未指定");
 });
 
 test("the card button accepts only the exact GitHub pull request URL", () => {

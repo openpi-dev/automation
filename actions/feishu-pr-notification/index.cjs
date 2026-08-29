@@ -98,19 +98,20 @@ function formatNotificationCard(event, repository) {
       : "未指定";
 
   return {
-    config: { wide_screen_mode: true },
+    config: { wide_screen_mode: false },
     header: {
       template: "blue",
-      title: plainText("New pull request"),
+      title: plainText(
+        `PR #${pr.number} · ${sanitizeFeishuField(pr.title)}`,
+      ),
     },
     elements: [
       {
         tag: "div",
         text: plainText(
-          `${sanitizeFeishuField(repository)} · PR #${pr.number}\n🟢 Open\n${sanitizeFeishuField(pr.title)}`,
+          `${sanitizeFeishuField(repository)} · 🟢 Open`,
         ),
       },
-      { tag: "hr" },
       {
         tag: "div",
         fields: [
@@ -122,7 +123,7 @@ function formatNotificationCard(event, repository) {
           {
             is_short: false,
             text: plainText(
-              `Branches\n${sanitizeFeishuField(pr.head.label)} → ${sanitizeFeishuField(pr.base.ref)}`,
+              `Source → target\n${sanitizeFeishuField(pr.head.label)} → ${sanitizeFeishuField(pr.base.ref)}`,
             ),
           },
         ],
