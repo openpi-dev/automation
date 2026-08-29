@@ -19,3 +19,9 @@ remain in each caller repository.
 ```sh
 npm test
 ```
+
+The suite exercises Feishu metadata sanitization, injection resistance, Unicode
+bounds, secret-pair handling, HMAC payloads, and response failures. It also
+executes release event/tag/package-version validation and locks the reusable
+workflow boundaries for draft suppression, OIDC, ancestry, and single-artifact
+publication.

@@ -19,29 +19,12 @@ jobs:
     steps:
       - name: Resolve release source
         id: source
-        env:
-          RELEASE_TAG: ${{ inputs.tag }}
-          EVENT_NAME: ${{ github.event_name }}
-          REF: ${{ github.ref }}
-        run: |
-          case "${EVENT_NAME}" in
-            workflow_dispatch)
-              test "${REF}" = "refs/heads/main"
-              ;;
-            push)
-              test "${REF}" = "refs/tags/${RELEASE_TAG}"
-              ;;
-            *)
-              echo "Unsupported release event: ${EVENT_NAME}"
-              exit 1
-              ;;
-          esac
-          git check-ref-format "refs/tags/${RELEASE_TAG}"
-          case "${RELEASE_TAG}" in
-            v*.*.*) ;;
-            *) exit 1 ;;
-          esac
-          printf 'tag=%s\n' "${RELEASE_TAG}" >>"${GITHUB_OUTPUT}"
+        uses: openpi-dev/automation/actions/openpi-release-validation@c631a31ed6f1851aebe0c0c20cf898f8013a5fbb
+        with:
+          mode: resolve
+          release_tag: ${{ inputs.tag }}
+          event_name: ${{ github.event_name }}
+          ref: ${{ github.ref }}
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
@@ -58,12 +41,13 @@ jobs:
         run: bun install --frozen-lockfile
       - run: bun run check
       - run: bun run test
-      - name: Verify tagged release source
-        env:
-          RELEASE_TAG: ${{ steps.source.outputs.tag }}
+      - name: Verify package version
+        uses: openpi-dev/automation/actions/openpi-release-validation@c631a31ed6f1851aebe0c0c20cf898f8013a5fbb
+        with:
+          mode: verify-package
+          release_tag: ${{ steps.source.outputs.tag }}
+      - name: Verify tagged release ancestry
         run: |
-          version="$(node -p "require('./package.json').version")"
-          test "${RELEASE_TAG}" = "v${version}"
           git fetch --no-tags origin main:refs/remotes/origin/main
           git merge-base --is-ancestor HEAD origin/main
       - name: Verify package contents
