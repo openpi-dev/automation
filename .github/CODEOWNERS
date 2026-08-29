@@ -1,0 +1,3 @@
+/.github/CODEOWNERS @tt-a1i
+/.github/workflows/** @tt-a1i @openpi-dev/release-managers
+/actions/** @tt-a1i @openpi-dev/release-managers

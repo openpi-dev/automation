@@ -1,0 +1,47 @@
+name: OpenPI Feishu PR notification
+
+on:
+  workflow_call:
+    secrets:
+      FEISHU_PR_BOT_WEBHOOK:
+        required: false
+      FEISHU_PR_BOT_SECRET:
+        required: false
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  notify:
+    name: Notify Feishu
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: ${{ github.event_name == 'pull_request_target' && !github.event.pull_request.draft }}
+    steps:
+      - name: Check notification configuration
+        id: config
+        env:
+          FEISHU_PR_BOT_WEBHOOK: ${{ secrets.FEISHU_PR_BOT_WEBHOOK }}
+          FEISHU_PR_BOT_SECRET: ${{ secrets.FEISHU_PR_BOT_SECRET }}
+        run: |
+          if test -z "${FEISHU_PR_BOT_WEBHOOK}" && test -z "${FEISHU_PR_BOT_SECRET}"; then
+            echo "Feishu bot secrets are not configured; skipping notification."
+            echo "enabled=false" >>"${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          if test -z "${FEISHU_PR_BOT_WEBHOOK}" || test -z "${FEISHU_PR_BOT_SECRET}"; then
+            echo "Both FEISHU_PR_BOT_WEBHOOK and FEISHU_PR_BOT_SECRET must be configured."
+            exit 1
+          fi
+
+          echo "enabled=true" >>"${GITHUB_OUTPUT}"
+      - name: Send PR notification
+        if: ${{ steps.config.outputs.enabled == 'true' }}
+        uses: openpi-dev/automation/actions/feishu-pr-notification@2ff72314d7aa18d373490ccd615b8d69e91cf408
+        env:
+          FEISHU_PR_BOT_WEBHOOK: ${{ secrets.FEISHU_PR_BOT_WEBHOOK }}
+          FEISHU_PR_BOT_SECRET: ${{ secrets.FEISHU_PR_BOT_SECRET }}
+          REPOSITORY: ${{ github.repository }}
+          EVENT_PATH: ${{ github.event_path }}
