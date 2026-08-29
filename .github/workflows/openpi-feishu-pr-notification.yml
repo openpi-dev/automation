@@ -20,7 +20,7 @@ jobs:
     if: ${{ github.event_name == 'pull_request_target' && !github.event.pull_request.draft }}
     steps:
       - name: Send PR notification
-        uses: openpi-dev/automation/actions/feishu-pr-notification@a5aacc1548cd48b7939f1a391926344237f501d3
+        uses: openpi-dev/automation/actions/feishu-pr-notification@a681421a59a9479f604717375eec01dea9f161f3
         env:
           FEISHU_PR_BOT_WEBHOOK: ${{ secrets.FEISHU_PR_BOT_WEBHOOK }}
           FEISHU_PR_BOT_SECRET: ${{ secrets.FEISHU_PR_BOT_SECRET }}

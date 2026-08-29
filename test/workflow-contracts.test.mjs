@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const FEISHU_ACTION_SHA = "a5aacc1548cd48b7939f1a391926344237f501d3";
+const FEISHU_ACTION_SHA = "a681421a59a9479f604717375eec01dea9f161f3";
 const RELEASE_ACTION_SHA = "df7b1ee59baae8a48b6930bbb0cc21f9571a8280";
 
 function workflow(name) {
