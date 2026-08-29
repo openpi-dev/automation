@@ -9,8 +9,6 @@ remain in each caller repository.
 
 ## Reusable workflows
 
-- `openpi-ci.yml` — OpenPI checks, tests, packaging smoke tests, and Windows
-  background-terminal coverage.
 - `openpi-release.yml` — validates an existing OpenPI version tag, builds the
   package artifact, and publishes it through npm trusted publishing.
 - `openpi-feishu-pr-notification.yml` — sends a bounded, sanitized notification
