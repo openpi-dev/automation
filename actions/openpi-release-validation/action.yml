@@ -1,0 +1,21 @@
+name: OpenPI release validation
+description: Validate an OpenPI release event, tag, and checked-out package version
+inputs:
+  mode:
+    description: Validation phase (`resolve` or `verify-package`)
+    required: true
+  release_tag:
+    description: Existing version tag selected by the caller
+    required: true
+  event_name:
+    description: Caller event name for source resolution
+    required: false
+  ref:
+    description: Caller Git ref for source resolution
+    required: false
+outputs:
+  tag:
+    description: Validated release tag
+runs:
+  using: node24
+  main: index.cjs
