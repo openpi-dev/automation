@@ -80,6 +80,10 @@ test("release validates and transfers one package artifact before publishing", (
   assert.match(publish, /environment: npm/u);
   assert.match(publish, /id-token: write/u);
   assert.match(publish, /actions\/download-artifact@[0-9a-f]{40}/u);
+  assert.match(
+    publish,
+    /find "\$PWD\/release-artifact" -maxdepth 1 -type f -name '\*\.tgz' -print/u,
+  );
   assert.match(publish, /test "\$\{#packages\[@\]\}" -eq 1/u);
   assert.match(
     publish,
